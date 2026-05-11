@@ -1,190 +1,149 @@
 # VitalWatch
 
-**Real-time patient event detection system using computer vision.**
+VitalWatch is a real-time patient monitoring prototype that uses computer vision to detect critical patient events from a webcam, RTSP stream, or local video file. It reads live frames, detects patient posture and movement, scores event severity, and displays alerts on a browser dashboard.
 
-VitalWatch accepts webcam or RTSP video streams, detects basic patient events (fall, bed-exit, abnormal movement, immobility), assigns severity scores, triggers structured alerts, and provides a simple live dashboard.
+## System Overview
 
----
-
-## Architecture (text diagram)
-
-```
-                    +------------------+
-                    |  Video Source    |
-                    | (Webcam / RTSP)  |
-                    +--------+---------+
-                             |
-                             v
-                    +------------------+
-                    |   VideoStream    |  (rolling buffer)
-                    +--------+---------+
-                             |
-         +-------------------+-------------------+
-         v                   v                   v
-+----------------+  +----------------+  +----------------+
-| ObjectDetector |  | PoseEstimator  |  | Motion metrics |
-|   (YOLOv8)     |  | (MediaPipe)   |  | (from pose)    |
-+--------+-------+  +--------+-------+  +--------+-------+
-         |                   |                   |
-         +-------------------+-------------------+
-                             |
-                             v
-                    +------------------+
-                    |   EventEngine    |  (rule-based)
-                    | fall, bed_exit,  |
-                    | immobility,      |
-                    | abnormal_movement|
-                    +--------+---------+
-                             |
-                             v
-                    +------------------+
-                    |  SeverityScorer  |  (0–1 score,
-                    | Normal/Warning/  |   level)
-                    | Critical         |
-                    +--------+---------+
-                             |
-                             v
-                    +------------------+
-                    |  AlertManager    |  log, console,
-                    |  WebSocket       |  optional sound
-                    +--------+---------+
-                             |
-         +-------------------+-------------------+
-         v                   v                   v
-   [ Console ]         [ WebSocket ]        [ Dashboard ]
-                            |
-                    +-------+-------+
-                    |  FastAPI      |
-                    | /stream       |
-                    | /alerts (WS)  |
-                    | /status      |
-                    +--------------+
+```mermaid
+flowchart LR
+    A[Video Source<br/>Webcam / RTSP / File] --> B[OpenCV Video Stream]
+    B --> C[YOLOv8<br/>Person Detection]
+    B --> D[MediaPipe<br/>Pose Estimation]
+    C --> E[Event Engine]
+    D --> E
+    E --> F[Severity Scorer]
+    F --> G[Alert Manager]
+    G --> H[FastAPI Backend]
+    H --> I[Dashboard<br/>Live Feed + Alerts]
 ```
 
----
+## Workflow
 
-## Project layout
+```mermaid
+sequenceDiagram
+    participant Source as Video Source
+    participant Stream as VideoStream
+    participant AI as Detection + Pose
+    participant Engine as Event Engine
+    participant Score as Severity Scorer
+    participant API as FastAPI / WebSocket
+    participant UI as Dashboard
 
+    Source->>Stream: Send video frames
+    Stream->>AI: Provide current frame
+    AI->>Engine: Person boxes + pose metrics
+    Engine->>Score: Detected event
+    Score->>API: Severity alert
+    API->>UI: Live stream and real-time alert
 ```
-/src
-  /video       stream.py          # VideoStream (webcam, RTSP, buffer)
-  /models      detector.py       # YOLOv8 object detection
-                pose.py          # MediaPipe pose
-  /events      event_engine.py   # Rule-based event detection
-  /severity    scoring.py       # Severity score and level
-  /alerts      alert_manager.py # Log, console, WebSocket
-  /api         server.py        # FastAPI + MJPEG + WebSocket
-  main.py                        # Pipeline entrypoint
-/dashboard     index.html        # Simple live dashboard
+
+## Core Modules
+
+```mermaid
+flowchart TD
+    SRC[src/] --> VIDEO[video/<br/>Frame capture and buffering]
+    SRC --> MODELS[models/<br/>YOLOv8 and MediaPipe wrappers]
+    SRC --> EVENTS[events/<br/>Fall, bed-exit, immobility rules]
+    SRC --> SEVERITY[severity/<br/>Risk scoring]
+    SRC --> ALERTS[alerts/<br/>Alert logging and broadcast]
+    SRC --> API[api/<br/>FastAPI routes and WebSocket]
+    DASH[dashboard/] --> WEB[index.html<br/>Live monitoring UI]
+```
+
+## Features
+
+| Area | Capability |
+| --- | --- |
+| Input | Webcam, RTSP stream, or local video file |
+| Detection | Person detection with YOLOv8 |
+| Pose | Patient posture and movement tracking with MediaPipe |
+| Events | Fall, bed exit, immobility, abnormal movement |
+| Severity | Normal, Warning, and Critical scoring |
+| Backend | FastAPI, MJPEG stream, WebSocket alerts |
+| Dashboard | Live feed, severity status, and event history |
+
+## Tech Stack
+
+```mermaid
+mindmap
+  root((VitalWatch))
+    Computer Vision
+      OpenCV
+      YOLOv8
+      MediaPipe
+    Backend
+      Python
+      FastAPI
+      Uvicorn
+      WebSockets
+    Frontend
+      HTML
+      CSS
+      JavaScript
+```
+
+## Project Structure
+
+```text
+src/
+  alerts/       Alert handling and WebSocket broadcast hooks
+  api/          FastAPI server and dashboard routes
+  events/       Rule-based patient event detection
+  models/       Object detection and pose estimation
+  severity/     Severity scoring logic
+  video/        Video capture and frame buffering
+dashboard/      Browser dashboard
 requirements.txt
-README.md
 ```
 
----
+## Data Flow
 
-## Installation
+```text
+Camera / RTSP / Video
+        |
+        v
+OpenCV frame reader
+        |
+        +--> YOLOv8 person detection
+        |
+        +--> MediaPipe pose estimation
+                  |
+                  v
+          Rule-based event engine
+                  |
+                  v
+          Severity scoring
+                  |
+                  v
+        Console logs + WebSocket alerts
+                  |
+                  v
+             Web dashboard
+```
 
-1. **Clone or open the project**
+## Setup
 
-   ```bash
-   cd TeleICU-Monitoring-System-main
-   ```
+```bash
+python -m venv .venv
+.venv\Scripts\activate
+pip install -r requirements.txt
+```
 
-2. **Create a virtual environment (recommended)**
-
-   ```bash
-   python -m venv venv
-   venv\Scripts\activate   # Windows
-   # source venv/bin/activate  # macOS/Linux
-   ```
-
-3. **Install dependencies**
-
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-   On first run, YOLOv8 will download a pretrained weights file (e.g. `yolov8n.pt`) if not present.
-
----
-
-## How to run
-
-**With dashboard (default):**
+## Run
 
 ```bash
 python -m src.main 0
 ```
 
-- `0` = default webcam. Use another index for a different camera.
-- Open **http://localhost:8000** for the dashboard (live feed, severity, alerts, event log).
+Open `http://localhost:8000` to view the dashboard.
 
-**RTSP stream:**
+Use an RTSP stream or local video file instead of `0` when needed:
 
 ```bash
 python -m src.main "rtsp://user:pass@host/path"
-```
-
-**Video file:**
-
-```bash
 python -m src.main path/to/video.mp4
 ```
 
-**Without web server (OpenCV window only):**
-
-```bash
-python -m src.main 0 --no-server
-```
-
-**Options:**
-
-- `--port 8000` – API/dashboard port (default 8000).
-- `--model yolov8n.pt` – YOLOv8 model (default: pretrained nano).
-- `--no-server` – Disable FastAPI and dashboard; show only OpenCV window.
-
----
-
-## Supported inputs
-
-| Input        | Example                    |
-|-------------|----------------------------|
-| Webcam      | `0`, `1`                   |
-| RTSP        | `rtsp://host/path`         |
-| Local file  | `path/to/video.mp4`        |
-
----
-
-## Event types (MVP)
-
-- **Fall** – Horizontal posture (torso angle / low nose) from pose.
-- **Bed exit** – Person in upper frame or hip moving up (no bed model required).
-- **Immobility** – No significant motion for a configured duration (e.g. 30 s).
-- **Abnormal movement** – High movement intensity from pose.
-
-Severity is computed from event confidence, movement intensity, and duration. Alerts are logged, printed to console, and pushed over WebSocket to the dashboard.
-
----
-
-## Dashboard
-
-- **Live video feed** – MJPEG from `/stream`.
-- **Severity indicator** – Green (Normal), Yellow (Warning), Red (Critical).
-- **Active alerts panel** – Latest alerts from WebSocket.
-- **Event log** – Timestamps and event types.
-
----
-
-## Future roadmap
-
-- Optional bed detection (custom or pretrained model).
-- Configurable thresholds via config file or env.
-- Optional recording of alert clips.
-- Integration with hospital or monitoring systems (APIs, webhooks).
-- Tuning and validation on real ICU/patient datasets.
-
----
-
 ## License
 
-See `LICENSE` in the repository. This project is provided as-is for monitoring and research use.
+This project is licensed under the terms in `LICENSE`.
