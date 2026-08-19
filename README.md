@@ -2,6 +2,17 @@
 
 VitalWatch is a real-time patient monitoring prototype that uses computer vision to detect critical patient events from a webcam, RTSP stream, or local video file. It reads live frames, detects patient posture and movement, scores event severity, and displays alerts on a browser dashboard.
 
+## My Contribution
+
+VitalWatch was developed as a team project. I primarily contributed to the
+AI/ML and computer vision module, including:
+
+- Computer vision processing using OpenCV
+- Integration of YOLOv8 for person detection
+- Integration of MediaPipe for pose estimation
+- Patient event detection and severity scoring
+- Integration of the vision pipeline with the FastAPI backend and REST/WebSocket APIs
+
 ## System Overview
 
 ```mermaid
